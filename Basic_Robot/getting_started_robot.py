@@ -15,7 +15,7 @@
 
 from isaacsim import SimulationApp
 
-simulation_app = SimulationApp({"headless": False})  # start the simulation app, with GUI open
+simulation_app = SimulationApp({"headless": False, "enable": ["omni.activity.ui"]})  # start the simulation app, with GUI open
 
 import sys
 
@@ -42,14 +42,19 @@ set_camera_view(
 )  # set camera view
 
 # Add Franka
+print("Adding Franka...")
 asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
 add_reference_to_stage(usd_path=asset_path, prim_path="/World/Arm")  # add robot to stage
 arm = Articulation(prim_paths_expr="/World/Arm", name="my_arm")  # create an articulation object
+print("Franka added!")
 
 # Add Carter
-asset_path = assets_root_path + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
+print("Adding Carter...")
+# asset_path = assets_root_path + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
+asset_path = "/home/chong/isaac-sim-assets/isaac-sim-assets-robots_and_sensors-5.0.0/Assets/Isaac/5.0/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
 add_reference_to_stage(usd_path=asset_path, prim_path="/World/Car")
 car = Articulation(prim_paths_expr="/World/Car", name="my_car")
+print("Carter added!")
 
 # set the initial poses of the arm and the car so they don't collide BEFORE the simulation starts
 arm.set_world_poses(positions=np.array([[0.0, 1.0, 0.0]]) / get_stage_units())
