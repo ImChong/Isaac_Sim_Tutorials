@@ -31,7 +31,7 @@ class HelloWorld(BaseSample):
         world = self.get_world()
         world.scene.add_default_ground_plane()
 
-        fancy_cube = world.scene.add(
+        fancy_cube = world.scene.add(       # noqa: F841
             DynamicCuboid(
                 prim_path="/World/random_cube",     # The prim path of the cube in the USD stage
                 name="fancy_cube",                  # The unique name used to retrieve the object from the scene later on
