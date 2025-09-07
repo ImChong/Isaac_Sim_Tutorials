@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from isaacsim.examples.interactive.base_sample import BaseSample
+from isaacsim.robot.wheeled_robots.robots import WheeledRobot
+from isaacsim.core.utils.types import ArticulationAction
+from isaacsim.core.api.controllers import BaseController
+import numpy as np
+
+# Note: checkout the required tutorials at https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+
+
+class CoolController(BaseController):
+    def __init__(self):
+        super().__init__(name="my_cool_controller")
+        # An open loop controller that uses a unicycle model
+        self._wheel_radius = 0.03
+        self._wheel_base = 0.1125
+        return
+
+    def forward(self, command):
+        # command will have two elements, first element is the forward velocity
+        # second element is the angular velocity (yaw only).
+        joint_velocities = [0.0, 0.0]
+        joint_velocities[0] = ((2 * command[0]) - (command[1] * self._wheel_base)) / (2 * self._wheel_radius)
+        joint_velocities[1] = ((2 * command[0]) + (command[1] * self._wheel_base)) / (2 * self._wheel_radius)
+        # A controller has to return an ArticulationAction
+        return ArticulationAction(joint_velocities=joint_velocities)
+
+
+class HelloWorld(BaseSample):
+    def __init__(self) -> None:
+        super().__init__()
+        return
+
+    def setup_scene(self):
+        world = self.get_world()
+        world.scene.add_default_ground_plane()
+
+        assets_root_path = "/home/chong/isaac-sim-assets/isaac-sim-assets-robots_and_sensors-5.0.0/Assets/Isaac/5.0"
+        jetbot_asset_path = assets_root_path + "/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd"
+        self._jetbot = world.scene.add(
+            WheeledRobot(
+                prim_path="/World/Fancy_Robot",
+                name="fancy_robot",
+                wheel_dof_names=["left_wheel_joint", "right_wheel_joint"],
+                create_robot=True,
+                usd_path=jetbot_asset_path,
+            )
+        )
+
+        return
+
+    async def setup_post_load(self):
+        self._world = self.get_world()
+        self._jetbot = self._world.scene.get_object("fancy_robot")
+        self._world.add_physics_callback("sending_actions", callback_fn=self.send_robot_actions)
+        self._my_controller = CoolController()
+        return
+
+    def send_robot_actions(self, step_size):
+        print("current time: ", self._world.current_time)
+        self._jetbot.apply_action(self._my_controller.forward(command=[0.20, np.pi / 4]))
+        return
+
+    async def setup_pre_reset(self):
+        return
+
+    async def setup_post_reset(self):
+        return
+
+    def world_cleanup(self):
+        return
