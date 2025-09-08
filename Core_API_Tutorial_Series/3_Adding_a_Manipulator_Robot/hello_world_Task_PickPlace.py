@@ -56,6 +56,7 @@ class HelloWorld(BaseSample):
     async def setup_post_reset(self):
         print("=" * 25, "setup_post_reset", "=" * 25)
         self._controller.reset()
+        self._world.add_physics_callback("sim_step", callback_fn=self.physics_step)
         await self._world.play_async()
         return
 
