@@ -3,6 +3,7 @@ from isaacsim.robot.manipulators.examples.franka.tasks import PickPlace
 from isaacsim.robot.wheeled_robots.robots import WheeledRobot
 from isaacsim.robot.wheeled_robots.controllers.wheel_base_pose_controller import WheelBasePoseController
 from isaacsim.robot.wheeled_robots.controllers.differential_controller import DifferentialController
+from isaacsim.robot.manipulators.examples.franka.controllers import PickPlaceController
 from isaacsim.core.api.tasks import BaseTask
 from isaacsim.core.utils.types import ArticulationAction
 import numpy as np
@@ -48,6 +49,7 @@ class RobotsPlaying(BaseTask):
                 "goal_position": self._jetbot_goal_position
             }
         }
+        observations.update(self._pick_place_task.get_observations())
         return observations
 
     def get_params(self):
@@ -91,8 +93,15 @@ class HelloWorld(BaseSample):
     async def setup_post_load(self):
         self._world = self.get_world()
         task_params = self._world.get_task("awesome_task").get_params()
+        # We need franka later to apply to it actions
+        self._franka = self._world.scene.get_object(task_params["franka_name"]["value"])
         self._jetbot = self._world.scene.get_object(task_params["jetbot_name"]["value"])
+        # We need the cube later on for the pick place controller
         self._cube_name = task_params["cube_name"]["value"]
+        # Add Franka Controller
+        self._franka_controller = PickPlaceController(name="pick_place_controller",
+                                                      gripper=self._franka.gripper,
+                                                      robot_articulation=self._franka)
         self._jetbot_controller = WheelBasePoseController(name="cool_controller",
                                                           open_loop_wheel_controller=DifferentialController(name="simple_control",
                                                                                                             wheel_radius=0.03, wheel_base=0.1125))
@@ -101,6 +110,7 @@ class HelloWorld(BaseSample):
         return
 
     async def setup_post_reset(self):
+        self._franka_controller.reset()
         self._jetbot_controller.reset()
         self._world.add_physics_callback("sim_step", callback_fn=self.physics_step)
         await self._world.play_async()
@@ -109,7 +119,6 @@ class HelloWorld(BaseSample):
     def physics_step(self, step_size):
         print("=" * 20, "task: physics_step", "=" * 20)
         current_observations = self._world.get_observations()
-        print("current_observations[task_event]:", current_observations["task_event"])
         if current_observations["task_event"] == 0:
             self._jetbot.apply_wheel_actions(
                 self._jetbot_controller.forward(
@@ -117,10 +126,16 @@ class HelloWorld(BaseSample):
                     start_orientation=current_observations[self._jetbot.name]["orientation"],
                     goal_position=current_observations[self._jetbot.name]["goal_position"]))
         elif current_observations["task_event"] == 1:
-            # Go backwards
             self._jetbot.apply_wheel_actions(ArticulationAction(joint_velocities=[-8, -8]))
         elif current_observations["task_event"] == 2:
-            # Apply zero velocity to override the velocity applied before.
-            # Note: target joint positions and target joint velocities will stay active unless changed
             self._jetbot.apply_wheel_actions(ArticulationAction(joint_velocities=[0.0, 0.0]))
+            # Pick up the block
+            actions = self._franka_controller.forward(
+                picking_position=current_observations[self._cube_name]["position"],
+                placing_position=current_observations[self._cube_name]["target_position"],
+                current_joint_positions=current_observations[self._franka.name]["joint_positions"])
+            self._franka.apply_action(actions)
+        # Pause once the controller is done
+        if self._franka_controller.is_done():
+            self._world.pause()
         return
